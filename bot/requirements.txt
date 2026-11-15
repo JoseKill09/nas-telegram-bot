@@ -1,0 +1,12 @@
+python-telegram-bot[job-queue]==21.6
+telethon==1.36.0
+cryptg==0.4.0
+aria2p==0.11.3
+python-dotenv==1.0.1
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+beautifulsoup4==4.12.3
+httpx[socks]==0.27.2
+yt-dlp>=2024.08.06
+tzdata==2024.2
+cryptography>=42.0.0

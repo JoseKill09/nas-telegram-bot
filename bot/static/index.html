@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NAS Downloader</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0f0f12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NAS Bot">
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+  (function () {
+    var tgw = window.Telegram ? window.Telegram.WebApp : null;
+    var inTelegram = !!(tgw && tgw.initData);
+    var light = inTelegram ? tgw.colorScheme === "light"
+      : !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches);
+    document.documentElement.setAttribute("data-theme", light ? "light" : "dark");
+  })();
+</script>
+<link rel="stylesheet" href="/style.css?v=20">
+<link rel="stylesheet" href="/ui19.css?v=10">
+</head>
+<body>
+
+<div id="blocked" class="blocked hidden">
+  <div class="blocked-box">
+    <div class="blocked-icon" data-icon="lock" data-icon-size="40"></div>
+    <p>Esta página solo puede abrirse desde el bot de Telegram.</p>
+    <p class="blocked-hint">Para usarla en el navegador de tu red local, envía <b>/web</b> al bot y abre el enlace de acceso que te manda.</p>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1 id="pageTitle">Descargas</h1>
+      <div id="statusDot" class="status-dot"></div>
+    </div>
+    <div id="diskChip" class="disk-chip hidden"></div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="queue">Descargas</button>
+    <button class="tab" data-tab="search">Buscar</button>
+    <button class="tab" data-tab="files">Archivos</button>
+    <button class="tab" data-tab="history">Historial</button>
+    <button class="tab hidden" data-tab="settings" id="tabSettingsBtn">Ajustes</button>
+  </nav>
+
+  <main id="mainContent">
+    <section id="tab-queue" class="tab-panel active">
+      <div id="pendingBox"></div>
+      <div id="taskList" class="card-list"></div>
+      <h2 class="section-title" id="rdSectionTitle">Torrents en la nube (Real-Debrid / TorBox)</h2>
+      <div id="rdList" class="card-list"></div>
+      <p id="emptyState" class="empty hidden">No hay descargas activas.</p>
+    </section>
+
+    <section id="tab-search" class="tab-panel">
+      <div class="search-box-card">
+        <div class="search-input-wrap">
+          <input type="text" id="torrentSearchInput" placeholder="Ubuntu, Debian, Linux Mint..." autocomplete="off">
+          <button id="btnToggleFilters" class="btn btn-secondary filter-toggle-btn" title="Filtros de búsqueda">
+            <span data-icon="settings" data-icon-size="16"></span>
+            <span id="activeFiltersBadge" class="filter-count-badge hidden">0</span>
+          </button>
+          <button id="btnTorrentSearch" class="btn btn-primary"><span data-icon="search" data-icon-size="16"></span></button>
+        </div>
+
+        <div class="provider-chips-container">
+          <div class="provider-chips-track" id="providerChipsTrack">
+            <button class="chip-item active" data-provider="all">🌐 Todos</button>
+          </div>
+        </div>
+
+        <div id="searchFiltersPanel" class="filters-panel hidden">
+          <div class="filters-panel-header">
+            <div class="filters-panel-title">
+              <span data-icon="settings" data-icon-size="16"></span>
+              <span>Filtros de Calidad y Formato</span>
+            </div>
+            <button id="btnResetFilters" class="btn btn-link btn-reset-filters">Limpiar</button>
+          </div>
+
+          <div class="filter-group">
+            <div class="filter-group-label">Resolución</div>
+            <div class="filter-chips" id="filterResChips">
+              <button class="f-chip active" data-type="res" data-val="all">Todas</button>
+              <button class="f-chip" data-type="res" data-val="2160p">4K / 2160p</button>
+              <button class="f-chip" data-type="res" data-val="1080p">1080p FHD</button>
+              <button class="f-chip" data-type="res" data-val="720p">720p HD</button>
+              <button class="f-chip" data-type="res" data-val="480p">SD / 480p</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <div class="filter-group-label">Codificación (Códec)</div>
+            <div class="filter-chips" id="filterCodecChips">
+              <button class="f-chip active" data-type="codec" data-val="all">Todos</button>
+              <button class="f-chip" data-type="codec" data-val="x265">x265 / HEVC</button>
+              <button class="f-chip" data-type="codec" data-val="x264">x264 / AVC</button>
+              <button class="f-chip" data-type="codec" data-val="AV1">AV1</button>
+              <button class="f-chip" data-type="codec" data-val="XviD">XviD / DivX</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <div class="filter-group-label">Idioma (Audio / Doblaje)</div>
+            <div class="filter-chips" id="filterLangChips">
+              <button class="f-chip active" data-type="lang" data-val="all">Todos</button>
+              <button class="f-chip" data-type="lang" data-val="SPA">🇪🇸 SPA (Castellano)</button>
+              <button class="f-chip" data-type="lang" data-val="LAT">🇲🇽 LAT (Latino)</button>
+              <button class="f-chip" data-type="lang" data-val="ENG">🇬🇧 ENG (Inglés)</button>
+              <button class="f-chip" data-type="lang" data-val="ITA">🇮🇹 ITA</button>
+              <button class="f-chip" data-type="lang" data-val="FRE">🇫🇷 FRE</button>
+              <button class="f-chip" data-type="lang" data-val="GER">🇩🇪 GER</button>
+              <button class="f-chip" data-type="lang" data-val="JAP">🇯🇵 JAP</button>
+              <button class="f-chip" data-type="lang" data-val="DUAL">Dual / Multi</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <div class="filter-group-label">Fuente (Source)</div>
+            <div class="filter-chips" id="filterSourceChips">
+              <button class="f-chip active" data-type="source" data-val="all">Todas</button>
+              <button class="f-chip" data-type="source" data-val="BluRay">BluRay / Remux</button>
+              <button class="f-chip" data-type="source" data-val="WEB-DL">WEB-DL / WEBRip</button>
+              <button class="f-chip" data-type="source" data-val="HDTV">HDTV</button>
+              <button class="f-chip" data-type="source" data-val="DVD">DVD</button>
+              <button class="f-chip" data-type="source" data-val="no-cam">🚫 Excluir CAM/TS</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <div class="filter-group-label">Vídeo & Audio Especial</div>
+            <div class="filter-chips" id="filterExtraChips">
+              <button class="f-chip" data-type="extra" data-val="hdr">🌈 HDR / Dolby Vision</button>
+              <button class="f-chip" data-type="extra" data-val="atmos">🔊 Dolby Atmos / TrueHD</button>
+              <button class="f-chip" data-type="extra" data-val="10bit">🎨 10-bit Color</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <div class="filter-group-label" style="display:flex;justify-content:space-between;">
+              <span>Calidad Mínima</span>
+              <span id="filterMinScoreLabel" style="color:var(--accent);font-weight:700;">Cualquiera</span>
+            </div>
+            <input type="range" id="filterMinScoreSlider" min="1" max="9" step="1" value="1" style="width:100%;">
+          </div>
+        </div>
+      </div>
+
+      <div id="searchMetaInfo" class="search-meta hidden"></div>
+      <div id="searchResultsList" class="card-list"></div>
+      <div class="file-actions" style="margin-top:14px;">
+        <button id="btnSearchLoadMore" class="btn btn-secondary hidden" style="width:100%;padding:12px;"><span data-icon="down" data-icon-size="15"></span> Cargar más resultados</button>
+      </div>
+      <p id="searchEmptyState" class="empty">Introduce un término de búsqueda para encontrar torrents activos.</p>
+    </section>
+
+    <section id="tab-files" class="tab-panel">
+      <div id="breadcrumb" class="breadcrumb"></div>
+      <div id="fileList" class="card-list"></div>
+      <div class="file-actions">
+        <button id="btnNewFolder" class="btn btn-secondary"><span data-icon="plus" data-icon-size="14"></span> Nueva carpeta</button>
+      </div>
+    </section>
+
+    <section id="tab-history" class="tab-panel">
+      <div id="historyUserFilterContainer" class="history-filter-container hidden">
+        <div class="filter-group-label" style="margin-bottom: 8px;"><span data-icon="person" data-icon-size="14"></span> Filtrar por usuario</div>
+        <div id="historyUserChips" class="filter-chips"></div>
+      </div>
+      <div id="historyList" class="card-list"></div>
+      <div class="file-actions">
+        <button id="btnClearHistory" class="btn btn-danger"><span data-icon="trash" data-icon-size="14"></span> Limpiar historial</button>
+      </div>
+    </section>
+
+    <section id="tab-settings" class="tab-panel">
+      <div id="settingsMenu">
+        <div class="set-search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 100 14 7 7 0 000-14zm9 16l-4-4"/></svg><input type="search" id="settingsSearch" placeholder="Buscar un ajuste" autocomplete="off"></div>
+        <div class="set-group">
+          <div class="set-group-label">Descargas</div>
+          <div class="set-group-card">
+            <div class="settings-menu-item" data-section="providers"><div class="card-title">Proveedores</div><div class="card-sub">Real-Debrid, TorBox, Google Drive y clientes locales.</div></div>
+            <div class="settings-menu-item" data-section="limits"><div class="card-title">Límites y descompresión</div><div class="card-sub">Descargas simultáneas, hilos y borrado tras descomprimir.</div></div>
+            <div class="settings-menu-item" data-section="folders"><div class="card-title">Carpetas</div><div class="card-sub">Rutas del NAS a las que tiene acceso el bot.</div></div>
+            <div class="settings-menu-item" data-section="rules"><div class="card-title">Reglas de destino</div><div class="card-sub">Elegir la carpeta automáticamente según el nombre, tipo o tamaño.</div></div>
+            <div class="settings-menu-item" data-section="disk"><div class="card-title">Espacio en disco</div><div class="card-sub">Espacio libre, alertas y qué hacer si una descarga no cabe.</div></div>
+          </div>
+        </div>
+        <div class="set-group">
+          <div class="set-group-label">Búsqueda y contenido</div>
+          <div class="set-group-card">
+            <div class="settings-menu-item" data-section="sources"><div class="card-title">Buscadores</div><div class="card-sub">Webs de torrents, espejos y pruebas de funcionamiento.</div></div>
+            <div class="settings-menu-item" data-section="tmdb"><div class="card-title">TMDB</div><div class="card-sub">Carpetas automáticas con el nombre de la película o serie.</div></div>
+            <div class="settings-menu-item" data-section="userbot"><div class="card-title">Userbot</div><div class="card-sub">Cuenta de Telegram usada para descargar archivos reenviados.</div></div>
+          </div>
+        </div>
+        <div class="set-group">
+          <div class="set-group-label">Sistema</div>
+          <div class="set-group-card">
+            <div class="settings-menu-item" data-section="notifications"><div class="card-title">Notificaciones</div><div class="card-sub">Avisos cuando una descarga termina o falla.</div></div>
+            <div class="settings-menu-item" data-section="language"><div class="card-title">Idioma</div><div class="card-sub">Idioma del chat y de la web app.</div></div>
+            <div class="settings-menu-item" data-section="lan"><div class="card-title">Red local</div><div class="card-sub">Abrir el panel en el navegador de tu red local o desde tu VPN, sin dominio.</div></div>
+            <div class="settings-menu-item" data-section="users"><div class="card-title">Usuarios</div><div class="card-sub">Quién tiene acceso al bot, además de ti.</div></div>
+            <div class="settings-menu-item" data-section="backup"><div class="card-title">Copia de seguridad</div><div class="card-sub">Guardar y restaurar tu configuración, cifrada.</div></div>
+          </div>
+        </div>
+        <p class="empty hidden" id="settingsNoMatch">No hay ajustes que coincidan.</p>
+      </div>
+
+      <div id="settingsSection" class="hidden">
+        <button class="back-btn" id="settingsBack" type="button" aria-label="Volver"><span data-icon="arrowLeft" data-icon-size="20"></span></button>
+        <div id="settingsSectionContent"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="modalRoot"></div>
+<div id="centerModalRoot"></div>
+
+<button id="fabAdd" class="fab hidden" aria-label="Añadir descarga"><span data-icon="plus" data-icon-size="22"></span><span class="fab-label">Enlace o torrent</span></button>
+
+<script src="/i18n.js?v=20"></script>
+<script src="/app.js?v=35"></script>
+<script src="/select.js?v=1"></script>
+<script src="/ui19.js?v=3"></script>
+<script>
+  if ("serviceWorker" in navigator && window.isSecureContext && !(window.Telegram && Telegram.WebApp && Telegram.WebApp.initData)) {
+    navigator.serviceWorker.register("/sw.js").catch(function () {});
+  }
+</script>
+</body>
+</html>

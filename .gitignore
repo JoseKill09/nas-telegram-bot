@@ -1,0 +1,30 @@
+# Secrets / secretos
+.env
+.env.*
+!.env.example
+*.session
+*.session-journal
+*.pem
+*.key
+
+# Runtime data (database, tokens, downloads) / datos de ejecución
+data/
+*.db
+*.db-journal
+*.sqlite*
+
+# Local overrides (your own NAS paths) / ajustes locales (rutas de tu NAS)
+docker-compose.override.yml
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

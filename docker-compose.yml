@@ -1,0 +1,155 @@
+services:
+  bot:
+    build: ./bot
+    container_name: nas-telegram-bot
+    restart: unless-stopped
+    # CPU cap so extracting/converting can never starve the rest of the NAS
+    cpus: "${BOT_CPUS:-2}"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    env_file:
+      - .env
+    environment:
+      - TZ=${TZ:-UTC}
+      - ARIA2_SECRET=${ARIA2_SECRET:-change-this-secret}
+    # Web panel on your local network (Settings → Web app → 🏠 Local network). Nothing listens on it
+    # unless the web app or local network access is enabled. Change the left side with WEBAPP_LAN_PORT.
+    ports:
+      - "${WEBAPP_LAN_PORT:-8080}:8080"
+    volumes:
+      - ./data/bot_config:/config
+      - ${MEDIA_ROOT:-./data/media}:/media
+    networks:
+      - nas_net
+    depends_on:
+      - aria2
+
+  aria2:
+    image: p3terx/aria2-pro
+    container_name: aria2
+    restart: unless-stopped
+    environment:
+      - PUID=0
+      - PGID=0
+      - UMASK_SET=022
+      - RPC_SECRET=${ARIA2_SECRET:-change-this-secret}
+      - RPC_PORT=6800
+      - LISTEN_PORT=6888
+      - IPV6_MODE=false
+      - UPDATE_TRACKERS=false
+    volumes:
+      - ./data/aria2_config:/config
+      - ${MEDIA_ROOT:-./data/media}:/media
+    networks:
+      - nas_net
+
+  # Optional services have no fixed container_name so they never clash with other projects
+  qbittorrent:
+    profiles: ["qbittorrent"]
+    image: lscr.io/linuxserver/qbittorrent:latest
+    restart: unless-stopped
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=${TZ:-UTC}
+      - WEBUI_PORT=8081
+    ports:
+      - "8081:8081"
+      - "6881:6881"
+      - "6881:6881/udp"
+    volumes:
+      - ./data/qbittorrent_config:/config
+      - ${MEDIA_ROOT:-./data/media}:/media
+    networks:
+      - nas_net
+
+  transmission:
+    profiles: ["transmission"]
+    image: lscr.io/linuxserver/transmission:latest
+    restart: unless-stopped
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=${TZ:-UTC}
+    ports:
+      - "9091:9091"
+      - "51413:51413"
+      - "51413:51413/udp"
+    volumes:
+      - ./data/transmission_config:/config
+      - ${MEDIA_ROOT:-./data/media}:/media
+    networks:
+      - nas_net
+
+  deluge:
+    profiles: ["deluge"]
+    image: lscr.io/linuxserver/deluge:latest
+    restart: unless-stopped
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=${TZ:-UTC}
+    ports:
+      - "8112:8112"
+      - "6882:6881"
+      - "6882:6881/udp"
+    volumes:
+      - ./data/deluge_config:/config
+      - ${MEDIA_ROOT:-./data/media}:/media
+    networks:
+      - nas_net
+
+  # Optional torrent indexer manager: the bot can search all its indexers at once
+  # (Settings → Search sources → Prowlarr, URL http://prowlarr:9696). Web UI on port 9696.
+  prowlarr:
+    profiles: ["prowlarr"]
+    image: lscr.io/linuxserver/prowlarr:latest
+    restart: unless-stopped
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=${TZ:-UTC}
+    ports:
+      - "9696:9696"
+    volumes:
+      - ./data/prowlarr_config:/config
+    networks:
+      - nas_net
+
+  # Optional: lets Prowlarr open indexers protected by Cloudflare's browser challenge.
+  # In Prowlarr add it as an Indexer Proxy with host http://flaresolverr:8191 (no port is published).
+  flaresolverr:
+    profiles: ["flaresolverr"]
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TZ:-UTC}
+    networks:
+      - nas_net
+
+  warp:
+    profiles: ["warp"]
+    image: caomingjun/warp:latest
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - MKNOD
+      - AUDIT_WRITE
+    device_cgroup_rules:
+      - 'c 10:200 rwm'
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    environment:
+      - WARP_SLEEP=2
+    volumes:
+      - ./data/warp_data:/var/lib/cloudflare-warp
+    networks:
+      - nas_net
+
+networks:
+  nas_net:
+    name: nas_net
+    driver: bridge
